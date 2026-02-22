@@ -4,8 +4,11 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"log"
+	"net"
 	"net/http"
 	"net/url"
+	"strings"
 
 	"github.com/kumakikensuke/url-shortener/internal/repository"
 )
@@ -15,16 +18,21 @@ type shortenerService interface {
 	Resolve(ctx context.Context, code string) (string, error)
 }
 
-type Handler struct {
-	svc shortenerService
+type rateLimiter interface {
+	Allow(ctx context.Context, ip string) (bool, error)
 }
 
-func New(svc shortenerService) *Handler {
-	return &Handler{svc: svc}
+type Handler struct {
+	svc     shortenerService
+	limiter rateLimiter
+}
+
+func New(svc shortenerService, limiter rateLimiter) *Handler {
+	return &Handler{svc: svc, limiter: limiter}
 }
 
 func (h *Handler) RegisterRoutes(mux *http.ServeMux) {
-	mux.HandleFunc("POST /shorten", h.Shorten)
+	mux.HandleFunc("POST /shorten", h.rateLimit(h.Shorten))
 	mux.HandleFunc("GET /health", h.Health)
 	mux.HandleFunc("GET /{code}", h.Redirect)
 }
@@ -36,6 +44,23 @@ type shortenRequest struct {
 type shortenResponse struct {
 	Code     string `json:"code"`
 	ShortURL string `json:"short_url"`
+}
+
+func (h *Handler) rateLimit(next http.HandlerFunc) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		ip := clientIP(r)
+		allowed, err := h.limiter.Allow(r.Context(), ip)
+		if err != nil {
+			log.Printf("rate limiter error (fail-open): %v", err)
+		}
+		if !allowed {
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusTooManyRequests)
+			w.Write([]byte(`{"error":"rate limit exceeded"}`))
+			return
+		}
+		next(w, r)
+	}
 }
 
 func (h *Handler) Shorten(w http.ResponseWriter, r *http.Request) {
@@ -84,4 +109,20 @@ func (h *Handler) Redirect(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) Health(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	w.Write([]byte(`{"status":"ok"}`))
+}
+
+// clientIP はリクエストからクライアントIPを取得する。
+// プロキシ経由の場合は X-Forwarded-For / X-Real-IP を優先する。
+func clientIP(r *http.Request) string {
+	if xff := r.Header.Get("X-Forwarded-For"); xff != "" {
+		return strings.TrimSpace(strings.SplitN(xff, ",", 2)[0])
+	}
+	if xri := r.Header.Get("X-Real-IP"); xri != "" {
+		return xri
+	}
+	host, _, err := net.SplitHostPort(r.RemoteAddr)
+	if err != nil {
+		return r.RemoteAddr
+	}
+	return host
 }
