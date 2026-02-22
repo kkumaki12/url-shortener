@@ -8,6 +8,7 @@ require (
 	github.com/aws/aws-sdk-go-v2/credentials v1.17.44
 	github.com/aws/aws-sdk-go-v2/feature/dynamodb/attributevalue v1.15.15
 	github.com/aws/aws-sdk-go-v2/service/dynamodb v1.36.5
+	github.com/redis/go-redis/v9 v9.18.0
 )
 
 require (
@@ -23,5 +24,8 @@ require (
 	github.com/aws/aws-sdk-go-v2/service/ssooidc v1.28.4 // indirect
 	github.com/aws/aws-sdk-go-v2/service/sts v1.32.4 // indirect
 	github.com/aws/smithy-go v1.22.0 // indirect
+	github.com/cespare/xxhash/v2 v2.3.0 // indirect
+	github.com/dgryski/go-rendezvous v0.0.0-20200823014737-9f7001d12a5f // indirect
 	github.com/jmespath/go-jmespath v0.4.0 // indirect
+	go.uber.org/atomic v1.11.0 // indirect
 )
