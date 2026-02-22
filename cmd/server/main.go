@@ -44,7 +44,8 @@ func main() {
 		log.Printf("warning: redis ping failed: %v (rate limiter will fail-open)", err)
 	}
 
-	repo := repository.NewDynamoRepository(dynamoClient, cfg.DynamoDBTable)
+	dynamoRepo := repository.NewDynamoRepository(dynamoClient, cfg.DynamoDBTable)
+	repo := repository.NewCachedRepository(dynamoRepo, rdb, cfg.CacheTTL)
 	svc := service.NewShortener(repo, cfg.BaseURL)
 	limiter := ratelimit.NewLimiter(rdb, cfg.RateLimitRPS, cfg.RateLimitBurst)
 	h := handler.New(svc, limiter)

@@ -3,6 +3,7 @@ package config
 import (
 	"os"
 	"strconv"
+	"time"
 )
 
 type Config struct {
@@ -16,6 +17,7 @@ type Config struct {
 	RedisAddr       string
 	RateLimitRPS    int
 	RateLimitBurst  int
+	CacheTTL        time.Duration
 }
 
 func Load() *Config {
@@ -30,6 +32,7 @@ func Load() *Config {
 		RedisAddr:      getEnv("REDIS_ADDR", "localhost:6379"),
 		RateLimitRPS:   getEnvInt("RATE_LIMIT_RPS", 10),
 		RateLimitBurst: getEnvInt("RATE_LIMIT_BURST", 20),
+		CacheTTL:       time.Duration(getEnvInt("CACHE_TTL", 86400)) * time.Second,
 	}
 }
 
